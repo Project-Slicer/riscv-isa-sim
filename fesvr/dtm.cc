@@ -54,11 +54,17 @@
     }                                                           \
   }
 
+#ifndef __x86_64__
+#error
+#endif
+
 uint32_t dtm_t::do_command(dtm_t::req r)
 {
+  fprintf(stderr, "in do_command, this %p req_buf %p %x %x %x\n", this, &req_buf, r.op, r.addr, r.data);
   req_buf = r;
   target->switch_to();
   assert(resp_buf.resp == 0);
+  fprintf(stderr, "do_command resp %x\n", resp_buf.data);
   return resp_buf.data;
 }
 
@@ -617,6 +623,8 @@ void dtm_t::tick(
   bool      resp_valid,
   resp      resp_bits)
 {
+  fprintf(stderr, "tick resp_wait %d req_wait %d\n", int(resp_wait), int(req_wait));
+
   if (!resp_wait) {
     if (!req_wait) {
       req_wait = true;

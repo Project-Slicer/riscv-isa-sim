@@ -9,6 +9,7 @@
 #include <vector>
 #include <string>
 #include <stdlib.h>
+#include <stdio.h>
 
 // abstract debug transport module
 class dtm_t : public htif_t
@@ -40,7 +41,7 @@ class dtm_t : public htif_t
 
   
   bool req_valid() { return req_wait; }
-  req req_bits() { return req_buf; }
+  req req_bits() { fprintf(stderr, "in req_bits, this %p req_buf %p\n", this, &req_buf); return req_buf; }
   bool resp_ready() { return true; }
 
   uint32_t read(uint32_t addr);
