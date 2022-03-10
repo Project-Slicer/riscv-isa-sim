@@ -546,16 +546,17 @@ class tdata1_csr_t: public csr_t {
   virtual bool unlogged_write(const reg_t val) noexcept override;
 };
 
+typedef std::shared_ptr<tdata1_csr_t> tdata1_csr_t_p;
+
 class tdata2_csr_t: public csr_t {
  public:
-  tdata2_csr_t(processor_t* const proc, const reg_t addr, const size_t count);
+  tdata2_csr_t(processor_t* const proc, const reg_t addr);
   virtual reg_t read() const noexcept override;
-  reg_t read(const size_t idx) const noexcept;
  protected:
   virtual bool unlogged_write(const reg_t val) noexcept override;
- private:
-  std::vector<reg_t> vals;
 };
+
+typedef std::shared_ptr<tdata2_csr_t> tdata2_csr_t_p;
 
 // For CSRs that are only writable from debug mode
 class debug_mode_csr_t: public basic_csr_t {
@@ -563,8 +564,6 @@ class debug_mode_csr_t: public basic_csr_t {
   debug_mode_csr_t(processor_t* const proc, const reg_t addr);
   virtual void verify_permissions(insn_t insn, bool write) const override;
 };
-
-typedef std::shared_ptr<tdata2_csr_t> tdata2_csr_t_p;
 
 
 class dpc_csr_t: public epc_csr_t {

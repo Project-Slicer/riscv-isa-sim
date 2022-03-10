@@ -11,6 +11,7 @@
 #include "processor.h"
 #include "memtracer.h"
 #include "byteorder.h"
+#include "triggers.h"
 #include <stdlib.h>
 #include <vector>
 
@@ -40,12 +41,12 @@ struct tlb_entry_t {
 class trigger_matched_t
 {
   public:
-    trigger_matched_t(int index,
-        trigger_operation_t operation, reg_t address, reg_t data) :
-      index(index), operation(operation), address(address), data(data) {}
+    trigger_matched_t(trigger::action_t action, trigger::operation_t operation,
+        reg_t address, reg_t data) :
+      action(action), operation(operation), address(address), data(data) {}
 
-    int index;
-    trigger_operation_t operation;
+    trigger::action_t action;
+    trigger::operation_t operation;
     reg_t address;
     reg_t data;
 };
@@ -111,7 +112,7 @@ public:
       if ((xlate_flags) == 0 && unlikely(tlb_load_tag[vpn % TLB_ENTRIES] == (vpn | TLB_CHECK_TRIGGERS))) { \
         type##_t data = from_target(*(target_endian<type##_t>*)(tlb_data[vpn % TLB_ENTRIES].host_offset + addr)); \
         if (!matched_trigger) { \
-          matched_trigger = trigger_exception(OPERATION_LOAD, addr, data); \
+          matched_trigger = trigger_exception(trigger::OPERATION_LOAD, addr, data); \
           if (matched_trigger) \
             throw *matched_trigger; \
         } \
@@ -170,7 +171,7 @@ public:
       } \
       else if ((xlate_flags) == 0 && unlikely(tlb_store_tag[vpn % TLB_ENTRIES] == (vpn | TLB_CHECK_TRIGGERS))) { \
         if (!matched_trigger) { \
-          matched_trigger = trigger_exception(OPERATION_STORE, addr, val); \
+          matched_trigger = trigger_exception(trigger::OPERATION_STORE, addr, val); \
           if (matched_trigger) \
             throw *matched_trigger; \
         } \
@@ -469,9 +470,10 @@ private:
     }
     if (unlikely(tlb_insn_tag[vpn % TLB_ENTRIES] == (vpn | TLB_CHECK_TRIGGERS))) {
       target_endian<uint16_t>* ptr = (target_endian<uint16_t>*)(tlb_data[vpn % TLB_ENTRIES].host_offset + addr);
-      int match = proc->trigger_match(OPERATION_EXECUTE, addr, from_target(*ptr));
-      if (match >= 0) {
-        throw trigger_matched_t(match, OPERATION_EXECUTE, addr, from_target(*ptr));
+      trigger::action_t action;
+      int match = proc->TM.memory_access_match(&action, trigger::OPERATION_EXECUTE, addr, from_target(*ptr));
+      if (match != trigger::MATCH_NONE) {
+        throw trigger_matched_t(action, trigger::OPERATION_EXECUTE, addr, from_target(*ptr));
       }
     }
     return result;
@@ -481,19 +483,22 @@ private:
     return (uint16_t*)(translate_insn_addr(addr).host_offset + addr);
   }
 
-  inline trigger_matched_t *trigger_exception(trigger_operation_t operation,
+  inline trigger_matched_t *trigger_exception(trigger::operation_t operation,
       reg_t address, reg_t data)
   {
     if (!proc) {
       return NULL;
     }
-    int match = proc->trigger_match(operation, address, data);
-    if (match == -1)
-      return NULL;
-    if (proc->state.mcontrol[match].timing == 0) {
-      throw trigger_matched_t(match, operation, address, data);
+    trigger::action_t action;
+    switch (proc->TM.memory_access_match(&action, operation, address, data)) {
+      case trigger::MATCH_NONE:
+        return NULL;
+      case trigger::MATCH_FIRE_BEFORE:
+        throw trigger_matched_t(action, operation, address, data);
+      case trigger::MATCH_FIRE_AFTER:
+        return new trigger_matched_t(action, operation, address, data);
     }
-    return new trigger_matched_t(match, operation, address, data);
+    assert(0);
   }
 
   reg_t pmp_homogeneous(reg_t addr, reg_t len);

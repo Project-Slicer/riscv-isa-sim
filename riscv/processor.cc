@@ -29,9 +29,10 @@ processor_t::processor_t(const char* isa, const char* priv, const char* varch,
   : isa_parser_t(isa), debug(false), halt_request(HR_NONE), sim(sim), id(id), xlen(0),
   histogram_enabled(false), log_commits_enabled(false),
   log_file(log_file), sout_(sout_.rdbuf()), halt_on_reset(halt_on_reset),
-  impl_table(256, false), last_pc(1), executions(1)
+  impl_table(256, false), last_pc(1), executions(1), TM(4)
 {
   VU.p = this;
+  TM.proc = this;
 
 #ifndef __SIZEOF_INT128__
   if (extension_enabled('V')) {
@@ -405,8 +406,6 @@ static int xlen_to_uxl(int xlen)
   abort();
 }
 
-const int state_t::num_triggers;
-
 void state_t::reset(processor_t* const proc, reg_t max_isa)
 {
   pc = DEFAULT_RSTVEC;
@@ -582,12 +581,9 @@ void state_t::reset(processor_t* const proc, reg_t max_isa)
   csrmap[CSR_DCSR] = dcsr = std::make_shared<dcsr_csr_t>(proc, CSR_DCSR);
 
   csrmap[CSR_TSELECT] = tselect = std::make_shared<tselect_csr_t>(proc, CSR_TSELECT);
-  memset(this->mcontrol, 0, sizeof(this->mcontrol));
-  for (auto &item : mcontrol)
-    item.type = 2;
 
   csrmap[CSR_TDATA1] = std::make_shared<tdata1_csr_t>(proc, CSR_TDATA1);
-  csrmap[CSR_TDATA2] = tdata2 = std::make_shared<tdata2_csr_t>(proc, CSR_TDATA2, num_triggers);
+  csrmap[CSR_TDATA2] = std::make_shared<tdata2_csr_t>(proc, CSR_TDATA2);
   csrmap[CSR_TDATA3] = std::make_shared<const_csr_t>(proc, CSR_TDATA3, 0);
   debug_mode = false;
   single_step = STEP_NONE;
@@ -1229,14 +1225,14 @@ void processor_t::trigger_updated()
   mmu->check_triggers_load = false;
   mmu->check_triggers_store = false;
 
-  for (unsigned i = 0; i < state.num_triggers; i++) {
-    if (state.mcontrol[i].execute) {
+  for (auto trigger: TM.triggers) {
+    if (trigger->checks_execute()) {
       mmu->check_triggers_fetch = true;
     }
-    if (state.mcontrol[i].load) {
+    if (trigger->checks_load()) {
       mmu->check_triggers_load = true;
     }
-    if (state.mcontrol[i].store) {
+    if (trigger->checks_store()) {
       mmu->check_triggers_store = true;
     }
   }

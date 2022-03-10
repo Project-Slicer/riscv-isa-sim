@@ -324,11 +324,11 @@ void processor_t::step(size_t n)
         delete mmu->matched_trigger;
         mmu->matched_trigger = NULL;
       }
-      switch (state.mcontrol[t.index].action) {
-        case ACTION_DEBUG_MODE:
+      switch (t.action) {
+        case trigger::ACTION_DEBUG_MODE:
           enter_debug_mode(DCSR_CAUSE_HWBP);
           break;
-        case ACTION_DEBUG_EXCEPTION: {
+        case trigger::ACTION_DEBUG_EXCEPTION: {
           trap_breakpoint trap(state.v, t.address);
           take_trap(trap, pc);
           break;
