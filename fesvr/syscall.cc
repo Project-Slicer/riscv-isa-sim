@@ -448,7 +448,7 @@ reg_t syscall_t::sys_chdir(reg_t path, reg_t a1, reg_t a2, reg_t a3, reg_t a4, r
 
 reg_t syscall_t::sys_getfdpath(reg_t fd, reg_t pbuf, reg_t size, reg_t a3, reg_t a4, reg_t a5, reg_t a6)
 {
-  auto fd_file = "/proc/self/fd/" + std::to_string(fd);
+  auto fd_file = "/proc/self/fd/" + std::to_string(fds.lookup(fd));
   std::vector<char> buf(size);
   ssize_t ret = readlink(fd_file.c_str(), buf.data(), size);
   reg_t ret_errno = sysret_errno(ret);
