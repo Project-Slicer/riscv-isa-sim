@@ -162,6 +162,7 @@ syscall_t::syscall_t(htif_t* htif)
   table[291] = &syscall_t::sys_statx;
   table[1039] = &syscall_t::sys_lstat;
   table[2011] = &syscall_t::sys_getmainvars;
+  table[2012] = &syscall_t::sys_getfdpath;
 
   register_command(0, std::bind(&syscall_t::handle_syscall, this, _1), "syscall");
 
@@ -443,6 +444,17 @@ reg_t syscall_t::sys_chdir(reg_t path, reg_t a1, reg_t a2, reg_t a3, reg_t a4, r
       break;
   }
   return sysret_errno(chdir(buf.data()));
+}
+
+reg_t syscall_t::sys_getfdpath(reg_t fd, reg_t pbuf, reg_t size, reg_t a3, reg_t a4, reg_t a5, reg_t a6)
+{
+  auto fd_file = "/proc/self/fd/" + std::to_string(fd);
+  std::vector<char> buf(size);
+  ssize_t ret = readlink(fd_file.c_str(), buf.data(), size);
+  reg_t ret_errno = sysret_errno(ret);
+  if (ret > 0)
+    memif->write(pbuf, ret, buf.data());
+  return ret_errno;
 }
 
 void syscall_t::dispatch(reg_t mm)
