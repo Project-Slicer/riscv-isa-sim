@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <termios.h>
+#include <sys/sendfile.h>
 #include <sstream>
 #include <iostream>
 using namespace std::placeholders;
@@ -156,6 +157,7 @@ syscall_t::syscall_t(htif_t* htif)
   table[64] = &syscall_t::sys_write;
   table[67] = &syscall_t::sys_pread;
   table[68] = &syscall_t::sys_pwrite;
+  table[71] = &syscall_t::sys_sendfile;
   table[79] = &syscall_t::sys_fstatat;
   table[80] = &syscall_t::sys_fstat;
   table[93] = &syscall_t::sys_exit;
@@ -455,6 +457,15 @@ reg_t syscall_t::sys_getfdpath(reg_t fd, reg_t pbuf, reg_t size, reg_t a3, reg_t
   if (ret > 0)
     memif->write(pbuf, ret, buf.data());
   return ret_errno;
+}
+
+reg_t syscall_t::sys_sendfile(reg_t out_fd, reg_t in_fd, reg_t poffset, reg_t count, reg_t a4, reg_t a5, reg_t a6)
+{
+  off_t offset;
+  reg_t ret = sysret_errno(sendfile(fds.lookup(out_fd), fds.lookup(in_fd), &offset, count));
+  if (ret >= 0 && poffset)
+    memif->write(poffset, sizeof(offset), &offset);
+  return ret;
 }
 
 void syscall_t::dispatch(reg_t mm)
