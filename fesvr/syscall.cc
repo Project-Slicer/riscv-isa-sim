@@ -461,11 +461,17 @@ reg_t syscall_t::sys_getfdpath(reg_t fd, reg_t pbuf, reg_t size, reg_t a3, reg_t
 
 reg_t syscall_t::sys_sendfile(reg_t out_fd, reg_t in_fd, reg_t poffset, reg_t count, reg_t a4, reg_t a5, reg_t a6)
 {
-  off_t offset;
-  reg_t ret = sysret_errno(sendfile(fds.lookup(out_fd), fds.lookup(in_fd), &offset, count));
+  off_t offset, *offsetp = NULL;
+  if (poffset)
+  {
+    memif->read(poffset, sizeof(offset), &offset);
+    offsetp = &offset;
+  }
+  ssize_t ret = sendfile(fds.lookup(out_fd), fds.lookup(in_fd), offsetp, count);
+  reg_t ret_errno = sysret_errno(ret);
   if (ret >= 0 && poffset)
     memif->write(poffset, sizeof(offset), &offset);
-  return ret;
+  return ret_errno;
 }
 
 void syscall_t::dispatch(reg_t mm)
