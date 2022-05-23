@@ -50,6 +50,8 @@ class compressors_t {
   ssize_t compress(const char *file_name);
   compressor_t::state_t take_if_done(size_t i);
 
+  size_t num_compressors() const { return compressors_.size(); }
+
  private:
   ssize_t select_compressor();
 
