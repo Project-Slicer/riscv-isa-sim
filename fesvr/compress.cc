@@ -77,13 +77,13 @@ class write_buffer_t {
   std::unique_ptr<uint8_t[]> buf_;
 };
 
-compressor_t::state_t compressor_t::compress(const char *file_name) {
+compressor_t::state_t compressor_t::compress(int dirfd, const char *file_name) {
   // update state
   assert(state_ == state_t::Ready);
   state_ = state_t::Compressing;
 
   // open input file and temporary output file
-  int in_fd = open(file_name, O_RDONLY);
+  int in_fd = openat(dirfd, file_name, O_RDONLY);
   char temp_file_name[] = "/tmp/fesvr-compress-XXXXXX";
   int temp_fd = mkstemp(temp_file_name);
   if (in_fd < 0 || temp_fd < 0) return state_ = state_t::Error;
@@ -119,7 +119,9 @@ compressor_t::state_t compressor_t::compress(const char *file_name) {
       original_size * compress_threshold_num_ / compress_threshold_den_) {
     if (unlink(temp_file_name) < 0) return error();
   } else {
-    if (rename(temp_file_name, file_name) < 0) return error();
+    if (renameat(AT_FDCWD, temp_file_name, dirfd, file_name) < 0) {
+      return error();
+    }
   }
   return state_ = state_t::Done;
 }
@@ -167,13 +169,13 @@ bool compressor_t::compress_file(int out_fd, int in_fd) {
   return true;
 }
 
-ssize_t compressors_t::compress(const char *file_name) {
+ssize_t compressors_t::compress(int dirfd, const char *file_name) {
   ssize_t i = select_compressor();
   if (i < 0) return i;
   compressors_[i].ready();
-  std::thread([i, file_name, this]() {
+  std::thread([this, i, dirfd, file_name]() {
     std::string file_name_copy(file_name);
-    compressors_[i].compress(file_name_copy.c_str());
+    compressors_[i].compress(dirfd, file_name_copy.c_str());
   }).detach();
   return i;
 }

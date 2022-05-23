@@ -25,7 +25,7 @@ class compressor_t {
         compress_threshold_num_(compress_threshold_num),
         compress_threshold_den_(compress_threshold_den) {}
 
-  state_t compress(const char *file_name);
+  state_t compress(int dirfd, const char *file_name);
   void reset() { state_ = state_t::Idle; }
   void ready() { state_ = state_t::Ready; }
 
@@ -47,7 +47,7 @@ class compressors_t {
                      compressor_t(write_buf_size, compress_threshold_num,
                                   compress_threshold_den)) {}
 
-  ssize_t compress(const char *file_name);
+  ssize_t compress(int dirfd, const char *file_name);
   compressor_t::state_t take_if_done(size_t i);
 
   size_t num_compressors() const { return compressors_.size(); }
