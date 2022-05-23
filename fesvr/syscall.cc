@@ -476,11 +476,12 @@ reg_t syscall_t::sys_sendfile(reg_t out_fd, reg_t in_fd, reg_t poffset, reg_t co
   return ret_errno;
 }
 
-reg_t syscall_t::sys_compressfile(reg_t pname, reg_t len, reg_t a2, reg_t a3, reg_t a4, reg_t a5, reg_t a6)
+reg_t syscall_t::sys_compressfile(reg_t dirfd, reg_t pname, reg_t len, reg_t a3, reg_t a4, reg_t a5, reg_t a6)
 {
   std::vector<char> name(len);
   memif->read(pname, len, name.data());
-  return compressors.compress(name.data());
+  return compressors.compress(fds.lookup(dirfd),
+                              int(dirfd) == RISCV_AT_FDCWD ? do_chroot(name.data()).c_str() : name.data());
 }
 
 reg_t syscall_t::sys_compressquery(reg_t id, reg_t a1, reg_t a2, reg_t a3, reg_t a4, reg_t a5, reg_t a6)
