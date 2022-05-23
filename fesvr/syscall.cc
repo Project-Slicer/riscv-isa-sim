@@ -139,7 +139,7 @@ struct riscv_statx
 #endif
 
 syscall_t::syscall_t(htif_t* htif)
-  : htif(htif), memif(&htif->memif()), table(2048)
+  : htif(htif), memif(&htif->memif()), table(2048), compressors(64, 1024, 9, 10)
 {
   table[17] = &syscall_t::sys_getcwd;
   table[25] = &syscall_t::sys_fcntl;
@@ -165,6 +165,8 @@ syscall_t::syscall_t(htif_t* htif)
   table[1039] = &syscall_t::sys_lstat;
   table[2011] = &syscall_t::sys_getmainvars;
   table[2012] = &syscall_t::sys_getfdpath;
+  table[2013] = &syscall_t::sys_compressfile;
+  table[2014] = &syscall_t::sys_compressquery;
 
   register_command(0, std::bind(&syscall_t::handle_syscall, this, _1), "syscall");
 
@@ -472,6 +474,25 @@ reg_t syscall_t::sys_sendfile(reg_t out_fd, reg_t in_fd, reg_t poffset, reg_t co
   if (ret >= 0 && poffset)
     memif->write(poffset, sizeof(offset), &offset);
   return ret_errno;
+}
+
+reg_t syscall_t::sys_compressfile(reg_t pname, reg_t len, reg_t a2, reg_t a3, reg_t a4, reg_t a5, reg_t a6)
+{
+  std::vector<char> name(len);
+  memif->read(pname, len, name.data());
+  return compressors.compress(name.data());
+}
+
+reg_t syscall_t::sys_compressquery(reg_t id, reg_t a1, reg_t a2, reg_t a3, reg_t a4, reg_t a5, reg_t a6)
+{
+  if (id >= compressors.num_compressors())
+    return -1;
+  auto state = compressors.take_if_done(id);
+  if (state == compressor_t::state_t::Done)
+    return 0;
+  if (state == compressor_t::state_t::Error)
+    return 1;
+  return 2;
 }
 
 void syscall_t::dispatch(reg_t mm)

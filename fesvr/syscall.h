@@ -5,6 +5,7 @@
 
 #include "device.h"
 #include "memif.h"
+#include "compress.h"
 #include <vector>
 #include <string>
 
@@ -38,6 +39,7 @@ class syscall_t : public device_t
   memif_t* memif;
   std::vector<syscall_func_t> table;
   fds_t fds;
+  compressors_t compressors;
 
   void handle_syscall(command_t cmd);
   void dispatch(addr_t mm);
@@ -70,6 +72,8 @@ class syscall_t : public device_t
   reg_t sys_chdir(reg_t, reg_t, reg_t, reg_t, reg_t, reg_t, reg_t);
   reg_t sys_getfdpath(reg_t, reg_t, reg_t, reg_t, reg_t, reg_t, reg_t);
   reg_t sys_sendfile(reg_t, reg_t, reg_t, reg_t, reg_t, reg_t, reg_t);
+  reg_t sys_compressfile(reg_t, reg_t, reg_t, reg_t, reg_t, reg_t, reg_t);
+  reg_t sys_compressquery(reg_t, reg_t, reg_t, reg_t, reg_t, reg_t, reg_t);
 };
 
 #endif
