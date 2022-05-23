@@ -64,7 +64,8 @@ class write_buffer_t {
 
   bool flush() {
     if (pos_ > 0) {
-      if (write(fd_, buf_.get(), pos_) != pos_) return false;
+      ssize_t ret = write(fd_, buf_.get(), pos_);
+      if (ret < 0 || static_cast<size_t>(ret) != pos_) return false;
       pos_ = 0;
     }
     return true;
@@ -138,7 +139,9 @@ bool compressor_t::compress_file(int out_fd, int in_fd) {
       if (file_buf[0] == queue[k]) {
         size_t cur_len = 0;
         for (size_t l = 0; l < j; l++) {
-          if (l >= ret || file_buf[l] != queue[k + l]) break;
+          if (l >= static_cast<size_t>(ret) || file_buf[l] != queue[k + l]) {
+            break;
+          }
           cur_len++;
         }
         if (cur_len > length) {
