@@ -139,7 +139,7 @@ struct riscv_statx
 #endif
 
 syscall_t::syscall_t(htif_t* htif)
-  : htif(htif), memif(&htif->memif()), table(2048), compressors(64, 1024, 9, 10)
+  : htif(htif), memif(&htif->memif()), table(2048), compressors(64, 1024, 0.9)
 {
   table[17] = &syscall_t::sys_getcwd;
   table[25] = &syscall_t::sys_fcntl;
