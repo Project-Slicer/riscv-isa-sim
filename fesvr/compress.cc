@@ -3,6 +3,7 @@
 #include "compress.h"
 
 #include <fcntl.h>
+#include <sys/sendfile.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -84,9 +85,10 @@ compressor_t::state_t compressor_t::compress(int dirfd, const char *file_name) {
 
   // open input file and temporary output file
   int in_fd = openat(dirfd, file_name, O_RDONLY);
+  if (in_fd < 0) return state_ = state_t::Error;
   char temp_file_name[] = "/tmp/fesvr-compress-XXXXXX";
   int temp_fd = mkstemp(temp_file_name);
-  if (in_fd < 0 || temp_fd < 0) return state_ = state_t::Error;
+  if (temp_fd < 0) return state_ = state_t::Error;
   auto error = [this, in_fd, temp_fd, temp_file_name]() {
     close(in_fd);
     close(temp_fd);
@@ -115,11 +117,10 @@ compressor_t::state_t compressor_t::compress(int dirfd, const char *file_name) {
   if (close(in_fd) < 0 || close(temp_fd) < 0) return error();
 
   // check the compressed size
-  if (compressed_size >=
-      original_size * compress_threshold_num_ / compress_threshold_den_) {
+  if (compressed_size >= original_size * compress_threshold_) {
     if (unlink(temp_file_name) < 0) return error();
   } else {
-    if (renameat(AT_FDCWD, temp_file_name, dirfd, file_name) < 0) {
+    if (!rename_file(AT_FDCWD, temp_file_name, dirfd, file_name)) {
       return error();
     }
   }
@@ -169,13 +170,42 @@ bool compressor_t::compress_file(int out_fd, int in_fd) {
   return true;
 }
 
+bool compressor_t::rename_file(int olddirfd, const char *oldpath, int newdirfd,
+                               const char *newpath) {
+  if (renameat(olddirfd, oldpath, newdirfd, newpath) < 0) {
+    if (errno == EXDEV) {
+      // open old file and new file
+      int old_fd = openat(olddirfd, oldpath, O_RDONLY);
+      int new_fd =
+          openat(newdirfd, newpath, O_WRONLY | O_TRUNC | O_CREAT, 0644);
+      if (old_fd < 0 || new_fd < 0) return false;
+      // get the size of the old file
+      struct stat st;
+      if (fstat(old_fd, &st) < 0) return false;
+      // copy the old file to the new file
+      off_t offset = 0;
+      while (offset < st.st_size) {
+        ssize_t ret = sendfile(new_fd, old_fd, &offset, st.st_size - offset);
+        if (ret < 0) return false;
+      }
+      // close old file and new file
+      if (close(old_fd) < 0 || close(new_fd) < 0) return false;
+      // remove old file
+      if (unlinkat(olddirfd, oldpath, 0) < 0) return false;
+    } else {
+      return false;
+    }
+  }
+  return true;
+}
+
 ssize_t compressors_t::compress(int dirfd, const char *file_name) {
   ssize_t i = select_compressor();
   if (i < 0) return i;
   compressors_[i].ready();
-  std::thread([this, i, dirfd, file_name]() {
-    std::string file_name_copy(file_name);
-    compressors_[i].compress(dirfd, file_name_copy.c_str());
+  std::string file_name_copy(file_name);
+  std::thread([this, i, dirfd, file_name = std::move(file_name_copy)]() {
+    compressors_[i].compress(dirfd, file_name.c_str());
   }).detach();
   return i;
 }
