@@ -15,6 +15,7 @@ fesvr_hdrs = \
   rfb.h \
   tsi.h \
   compress.h \
+  syscall_host.h \
 
 fesvr_install_hdrs = $(fesvr_hdrs)
 
