@@ -6,14 +6,12 @@
 #include "device.h"
 #include "memif.h"
 #include "compress.h"
+#include "syscall_host.h"
 #include <vector>
 #include <string>
 
 class syscall_t;
 typedef reg_t (syscall_t::*syscall_func_t)(reg_t, reg_t, reg_t, reg_t, reg_t, reg_t, reg_t);
-
-class htif_t;
-class memif_t;
 
 class fds_t
 {
@@ -28,14 +26,14 @@ class fds_t
 class syscall_t : public device_t
 {
  public:
-  syscall_t(htif_t*);
+  syscall_t(syscall_host_t*);
 
   void set_chroot(const char* where);
   
  private:
   const char* identity() { return "syscall_proxy"; }
 
-  htif_t* htif;
+  syscall_host_t* host;
   memif_t* memif;
   std::vector<syscall_func_t> table;
   fds_t fds;
