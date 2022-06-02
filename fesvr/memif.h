@@ -20,6 +20,8 @@ typedef enum {
 class chunked_memif_t
 {
 public:
+  virtual ~chunked_memif_t() = default;
+
   virtual void read_chunk(addr_t taddr, size_t len, void* dst) = 0;
   virtual void write_chunk(addr_t taddr, size_t len, const void* src) = 0;
   virtual void clear_chunk(addr_t taddr, size_t len) = 0;
